@@ -2,6 +2,7 @@
 import random
 import tkinter as tk
 
+from agent import SearchAgent
 
 class VisualGridHuntGame:
     """A flexible Pacman-style grid environment with support for configurable opponents and larger scales."""
@@ -89,7 +90,8 @@ class VisualGridHuntGame:
             'food_here': food_here,
             'grid_size': (self.width, self.height),
             'walls': list(self.walls),
-            'all_food': list(self.food_positions)
+            'all_food': list(self.food_positions),
+            'remaining_food': list(self.food_positions)
         }
 
     def execute_action(self, action: str):
@@ -313,6 +315,9 @@ class GridGameGUI:
 
         self.env = VisualGridHuntGame(width=width, height=height, num_food=num_food, num_opponents=num_opponents,
                                       custom_walls=walls)
+        
+        self.agent = SearchAgent()
+        self.agent.active_algo = 'AStar'
 
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
         max_canvas_dim = 600
@@ -384,23 +389,25 @@ class GridGameGUI:
         self.canvas.create_oval(x1, y1, x1 + self.cell_size * 0.7, y1 + self.cell_size * 0.7, fill="#000066",
                                 outline="#1e3a8a")
 
-    def run_loop(self):
-        self.btn.config(state="disabled")
+   def run_loop(self):
 
-        def step():
-            if not self.env.is_done():
-                action = random.choice(['Up', 'Down', 'Left', 'Right'])
-                self.env.execute_action(action)
+        if self.env.is_done():
+            return
 
-                self.draw_grid()
-                self.label.config(text=f"Score: {self.env.score} | Steps: {self.env.steps} | Action: {action}")
-                self.root.after(250, step)
-            else:
-                end_text = f"Collision! Game Over! Final Score: {self.env.score}" if self.env.collision else f"Finished! Final Score: {self.env.score}"
-                self.label.config(text=end_text)
-                self.btn.config(state="normal")
+        # Get percept from environment
+        percept = self.env.get_percept()
 
-        step()
+        # Ask SearchAgent for an action
+        action = self.agent.sense_and_act(percept)
+
+        # Execute the action
+        self.env.execute_action(action)
+
+        # Redraw the environment
+        self.draw_grid()
+
+        # Continue simulation
+        self.root.after(250, self.run_loop)
 
 
 if __name__ == "__main__":

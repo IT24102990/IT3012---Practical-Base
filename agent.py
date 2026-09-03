@@ -1,6 +1,6 @@
 from collections import deque
 import heapq
-
+import math
 
 class SearchAgent:
     """Goal-based agent using BFS, DFS and UCS search."""
@@ -171,6 +171,131 @@ class SearchAgent:
 
         return []
 
+    def manhattan_distance(self, pos, goal):
+        """
+        Calculate Manhattan Distance between two grid positions.
+        h(n) = |x1 - x2| + |y1 - y2|
+        """
+
+        x1, y1 = pos
+        x2, y2 = goal
+
+        return abs(x1 - x2) + abs(y1 - y2)
+
+    
+    def euclidean_distance(self, pos, goal):
+        """
+        Calculate Euclidean Distance between two grid positions.
+        h(n) = sqrt((x1-x2)^2 + (y1-y2)^2)
+        """
+
+        x1, y1 = pos
+        x2, y2 = goal
+
+        return math.sqrt(
+            (x1 - x2) ** 2 +
+            (y1 - y2) ** 2
+        )
+
+    def astar_search(self,start_pos,goal_pos,walls,grid_size,heuristic_type='manhattan'):
+
+        priority_queue = []
+
+        reached_states = set()
+
+        # g(n) = 0 at the starting position
+        g_cost = 0
+
+        # Calculate h(n)
+        if heuristic_type == 'euclidean':
+            h_cost = self.euclidean_distance(
+                start_pos,
+                goal_pos
+            )
+        else:
+            h_cost = self.manhattan_distance(
+                start_pos,
+                goal_pos
+            )
+
+        # f(n) = g(n) + h(n)
+        f_cost = g_cost + h_cost
+
+        # Tuple:
+        # (f_cost, g_cost, current_pos, path_taken)
+        heapq.heappush(
+            priority_queue,
+            (
+                f_cost,
+                g_cost,
+                start_pos,
+                []
+            )
+        )
+
+        while priority_queue:
+
+            f_cost, g_cost, current_pos, path_taken = \
+                heapq.heappop(priority_queue)
+
+            # Goal test
+            if current_pos == goal_pos:
+
+                return self.direction_path_to_actions(
+                    path_taken
+                )
+
+            # Skip already explored states
+            if current_pos in reached_states:
+                continue
+
+            reached_states.add(current_pos)
+
+            # Expand neighboring cells
+            for next_pos, direction in self.get_neighbors(
+                    current_pos,
+                    grid_size,
+                    walls):
+
+                if next_pos in reached_states:
+                    continue
+
+                # Every movement has cost 1
+                new_g_cost = g_cost + 1
+
+                # Calculate heuristic
+                if heuristic_type == 'euclidean':
+
+                    new_h_cost = self.euclidean_distance(
+                        next_pos,
+                        goal_pos
+                    )
+
+                else:
+
+                    new_h_cost = self.manhattan_distance(
+                        next_pos,
+                        goal_pos
+                    )
+
+                # f(n) = g(n) + h(n)
+                new_f_cost = new_g_cost + new_h_cost
+
+                new_path = path_taken + [direction]
+
+                heapq.heappush(
+                    priority_queue,
+                    (
+                        new_f_cost,
+                        new_g_cost,
+                        next_pos,
+                        new_path
+                    )
+                )
+
+        # No path found
+        return []
+
     def direction_path_to_actions(self, direction_path):
         """
         Convert grid directions such as Up/Down/Left/Right
@@ -209,6 +334,8 @@ class SearchAgent:
             current_facing = direction
 
         return actions
+
+    
 
     # Execute the search plan one action at a time
     def sense_and_act(self, percept: dict) -> str:
@@ -260,6 +387,31 @@ class SearchAgent:
                 all_food,
                 grid_size,
                 walls
+            )
+
+        elif self.active_algo == 'AStar':
+
+            remaining_food = percept['all_food']
+
+            if not remaining_food:
+                return 'MoveForward'
+
+            # Find closest food using Manhattan distance
+            goal_pos = min(
+                remaining_food,
+                key=lambda food:
+                    self.manhattan_distance(
+                        self.position,
+                        food
+                    )
+            )
+
+            self.plan = self.astar_search(
+                self.position,
+                goal_pos,
+                set(percept['walls']),
+                percept['grid_size'],
+                heuristic_type='manhattan'
             )
 
         else:
@@ -320,3 +472,16 @@ class SearchAgent:
 
             elif self.facing == 'Right':
                 self.position = (x + 1, y)
+
+if __name__ == "__main__":
+
+    agent = SearchAgent()
+
+    start = (0, 0)
+    goal = (3, 4)
+
+    print("Manhattan Distance:",
+        agent.manhattan_distance(start, goal))
+
+    print("Euclidean Distance:",
+        agent.euclidean_distance(start, goal))
